@@ -18,7 +18,7 @@ class DataQualityOperator(BaseOperator):
 
     def execute(self, context):
         redshift_hook = PostgresHook("redshift")
-        
+
         for check in dq_checks:
             sql = check["check_sql"]
             exp = check["expected_result"]
