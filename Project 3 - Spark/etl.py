@@ -26,11 +26,9 @@ def create_spark_session():
     Returns:
         SparkSession
     """
-    spark = SparkSession \
-        .builder \
-        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:2.7.0") \
-        .getOrCreate()
-    return spark
+    return SparkSession.builder.config(
+        "spark.jars.packages", "org.apache.hadoop:hadoop-aws:2.7.0"
+    ).getOrCreate()
 
 
 def process_song_data(spark, input_data, output_data):
@@ -89,7 +87,7 @@ def process_log_data(spark, input_data, output_data):
     df = spark.read.json(log_data)
     # filter by actions for song plays
     df= df.where(col("page")=="NextSong")
-   
+
     # extract columns for users table 
     # user_id, first_name, last_name, gender, level
     users_table = df['userId', 'firstName', 'lastName', 'gender', 'level','ts']
@@ -97,19 +95,22 @@ def process_log_data(spark, input_data, output_data):
     # write users table to parquet files
     users_table.write.parquet(os.path.join(output_data, 'users.parquet'), 'overwrite')
     print("(1/3) | users.parquet completed")
-    
-    
-    
+
+
+
     # create datetime column from original timestamp column
-    get_datetime = udf(lambda x: datetime.fromtimestamp(int(int(x)/1000)), TimestampType())
+    get_datetime = udf(
+        lambda x: datetime.fromtimestamp(int(x) // 1000), TimestampType()
+    )
+
     get_weekday = udf(lambda x: x.weekday())
     get_week = udf(lambda x: datetime.isocalendar(x)[1])
     get_hour = udf(lambda x: x.hour)
     get_day = udf(lambda x : x.day)
     get_year = udf(lambda x: x.year)
     get_month = udf(lambda x: x.month)
-    
-   
+
+
     df = df.withColumn('start_time', get_datetime(df.ts))
     df = df.withColumn('hour', get_hour(df.start_time))
     df = df.withColumn('day', get_day(df.start_time))
@@ -122,16 +123,16 @@ def process_log_data(spark, input_data, output_data):
     # write time table to parquet files partitioned by year and month
     time_table.write.partitionBy('year', 'month').parquet(os.path.join(output_data, 'time.parquet'), 'overwrite')
     print("(2/3) | time.parquet completed ")
-    
-    
+
+
     # read in song data to use for songplays table
     song_df = spark.read.parquet("results/songs.parquet")
 
     # extract columns from joined song and log datasets to create songplays table 
     df = df.join(song_df, (song_df.title == df.song) & (song_df.artist_name == df.artist))
-    df = df.withColumn('songplay_id', monotonically_increasing_id()) 
+    df = df.withColumn('songplay_id', monotonically_increasing_id())
     songplays_table = df['songplay_id','start_time', 'userId', 'level', 'song_id', 'artist_id', 'sessionId', 'location', 'userAgent']
-    
+
     # write songplays table to parquet files partitioned by year and month
     songplays_table.write.parquet(os.path.join(output_data, 'songplays.parquet'), 'overwrite')
     print("(3/3) | songplays.parquet completed")
